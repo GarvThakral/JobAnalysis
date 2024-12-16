@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://todo-app_owner:AEtbZeN9OK7l@ep-fancy-meadow-a5r12vvd.us-east-2.aws.neon.tech/todo-app?sslmode=require"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  username      String
+  email         String         @unique
+  password      String
+  AIAnalysis    AIAnalysis[]
+  jobs          Job[]          @relation("UserJobs")
+  notifications Notification[]
+}
+
+model Job {
+  id           String         @id @default(uuid())
+  userId       String
+  title        String
+  company      String
+  description  String
+  status       String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now())
+  AIAnalysis   AIAnalysis[]
+  user         User           @relation("UserJobs", fields: [userId], references: [id])
+  Notification Notification[]
+}
+
+model AIAnalysis {
+  id     String   @id @default(uuid())
+  userId String
+  jobId  String
+  type   String
+  date   DateTime @default(now())
+  job    Job      @relation(fields: [jobId], references: [id])
+  user   User     @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id     String   @id @default(uuid())
+  userId String
+  jobId  String?
+  type   String
+  date   DateTime @default(now())
+  job    Job?     @relation(fields: [jobId], references: [id])
+  user   User     @relation(fields: [userId], references: [id])
+}
