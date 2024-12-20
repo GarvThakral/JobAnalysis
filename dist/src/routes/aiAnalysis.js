@@ -17,12 +17,10 @@ const generative_ai_1 = require("@google/generative-ai");
 const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
 const pdfreader_1 = require("pdfreader");
 exports.aiRouter = (0, express_1.Router)();
 const genAI = new generative_ai_1.GoogleGenerativeAI("AIzaSyBrjNAMQdMztUGfXTDTtDEF78nSLkfvE9I");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
-// Function to extract text from PDF
 const extractPdfText = (filePath) => {
     return new Promise((resolve, reject) => {
         let text = "";
@@ -40,13 +38,9 @@ const extractPdfText = (filePath) => {
         });
     });
 };
-// Multer storage configuration
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
-        const uploadPath = path_1.default.join(__dirname, "uploads");
-        if (!fs_1.default.existsSync(uploadPath)) {
-            fs_1.default.mkdirSync(uploadPath, { recursive: true });
-        }
+        const uploadPath = path_1.default.join(__dirname, 'uploads');
         cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
@@ -54,40 +48,83 @@ const storage = multer_1.default.diskStorage({
         cb(null, uniqueSuffix);
     }
 });
-// Multer file filter for PDFs
 const fileFilter = (req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
+    if (file.mimetype === 'application/pdf') {
         cb(null, true);
     }
     else {
-        cb(new Error("Only PDF files are allowed"));
+        cb(new Error('Only PDF files are allowed'));
     }
 };
+exports.aiRouter.post('/analyzeDescription', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { description } = req.body;
+    const prompt = `{
+        "input": {
+            "job_description": "${description}"
+        },
+        "task": "Analyze",
+        "response_format": "JSON",
+        "response_schema": {
+            "job_title": "string",
+            "description_analysis": "string",
+            "required_skills": "array<string>",
+            "desired_skills": "array<string>",
+            "experience_level": "string"
+        }
+    }`;
+    try {
+        const result = yield model.generateContent(prompt);
+        const responseText = yield result.response.text();
+        const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
+        const json = JSON.parse(cleanedResponse);
+        res.json(json);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+}));
+const extractPdfTextFromBuffer = (buffer) => {
+    return new Promise((resolve, reject) => {
+        let text = "";
+        const reader = new pdfreader_1.PdfReader();
+        reader.parseBuffer(buffer, (err, item) => {
+            if (err) {
+                console.error("Error reading PDF:", err);
+                reject(err);
+            }
+            else if (!item) {
+                resolve(text); // End of file
+            }
+            else if (item.text) {
+                text += `${item.text} `; // Accumulate text
+            }
+        });
+    });
+};
+// Multer configuration for in-memory storage
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
-    fileFilter,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === "application/pdf") {
+            cb(null, true);
+        }
+        else {
+            cb(new Error("Only PDF files are allowed"));
+        }
+    },
 });
-// Helper function to clear the uploads directory
-const clearUploadsDirectory = () => {
-    const uploadPath = path_1.default.join(__dirname, "uploads");
-    if (fs_1.default.existsSync(uploadPath)) {
-        fs_1.default.readdirSync(uploadPath).forEach((file) => {
-            const filePath = path_1.default.join(uploadPath, file);
-            fs_1.default.unlinkSync(filePath);
-        });
-    }
-};
 // Route to analyze resume
-exports.aiRouter.post("/analyzeResume", upload.single("resumeFile"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.aiRouter.post('/analyzeResume', upload.single('resumeFile'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { jobDescription } = req.body || "";
     try {
         if (!req.file) {
-            res.status(400).json({ message: "No file uploaded" });
+            res.status(400).json({ message: 'No file uploaded' });
             return;
         }
-        const filePath = path_1.default.join(__dirname, "uploads", req.file.filename);
-        const resumeText = yield extractPdfText(filePath);
-        let prompt = "";
+        const resumeText = yield extractPdfText(`./dist/routes/uploads/${req.file.filename}`);
+        console.log(resumeText);
+        let prompt = '';
         if (jobDescription !== "") {
             prompt = `{
                 "input": {
@@ -102,7 +139,7 @@ exports.aiRouter.post("/analyzeResume", upload.single("resumeFile"), (req, res) 
                     "required_skills": "array<string>",
                     "desired_skills": "array<string>"
                 }
-            }`;
+                }`;
         }
         else {
             prompt = `{
@@ -115,25 +152,43 @@ exports.aiRouter.post("/analyzeResume", upload.single("resumeFile"), (req, res) 
                     "missing_keywords": "array<string>",
                     "detailed_analysis": "string"
                 }
-            }`;
+                }`;
         }
         try {
             const result = yield model.generateContent(prompt);
             const responseText = yield result.response.text();
-            const cleanedResponse = responseText.replace(/```json/g, "").replace(/```/g, "");
+            const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
             const json = JSON.parse(cleanedResponse);
-            // Clear uploads directory after successful response
-            clearUploadsDirectory();
             res.json(json);
         }
         catch (error) {
             console.error(error);
-            res.status(500).json({ message: "Server error", error });
+            res.status(500).json({ message: 'Server error', error });
         }
     }
     catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Server error", error });
+        res.status(500).json({ message: 'Server error', error });
     }
 }));
-exports.default = exports.aiRouter;
+exports.aiRouter.post('/interviewPrep', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { jobTitle, jobDescription } = req.body;
+    console.log(jobTitle, jobDescription);
+    const userId = req.userId;
+    const prompt = `{
+        "job_title": "${jobTitle}",
+        "job_description": "${jobDescription}",
+        "task": "Generate interview preparation tips based on the job description"
+    }`;
+    try {
+        const result = yield model.generateContent(prompt);
+        res.json({
+            result
+        });
+    }
+    catch (e) {
+        res.json({
+            e
+        });
+    }
+}));
