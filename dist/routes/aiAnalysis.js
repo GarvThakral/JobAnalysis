@@ -1,39 +1,46 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Router, Request, Response } from "express";
-import { userMiddleware } from "../middleware/userMiddleware";
-import multer from "multer";
-import path from 'path';
-import { PdfReader } from "pdfreader";
-
-export const aiRouter = Router();
-const genAI = new GoogleGenerativeAI("AIzaSyBrjNAMQdMztUGfXTDTtDEF78nSLkfvE9I");
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.aiRouter = void 0;
+const generative_ai_1 = require("@google/generative-ai");
+const express_1 = require("express");
+const multer_1 = __importDefault(require("multer"));
+const path_1 = __importDefault(require("path"));
+const pdfreader_1 = require("pdfreader");
+exports.aiRouter = (0, express_1.Router)();
+const genAI = new generative_ai_1.GoogleGenerativeAI("AIzaSyBrjNAMQdMztUGfXTDTtDEF78nSLkfvE9I");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
-
-const extractPdfText = (filePath: string): Promise<string> => {
+const extractPdfText = (filePath) => {
     return new Promise((resolve, reject) => {
         let text = "";
-
-        new PdfReader().parseFileItems(filePath, (err, item) => {
+        new pdfreader_1.PdfReader().parseFileItems(filePath, (err, item) => {
             if (err) {
                 console.error("Error reading PDF:", err);
                 reject(err);
-            } else if (!item) {
+            }
+            else if (!item) {
                 resolve(text); // End of file
-            } else if (item.text) {
+            }
+            else if (item.text) {
                 text += `${item.text} `; // Accumulate text
             }
         });
     });
 };
-
-interface customRequest extends Request {
-    userId?: string;
-    file?: Express.Multer.File;
-}
-
-const storage = multer.diskStorage({
+const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
-        const uploadPath = path.join(__dirname, 'uploads');
+        const uploadPath = path_1.default.join(__dirname, 'uploads');
         cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
@@ -41,17 +48,16 @@ const storage = multer.diskStorage({
         cb(null, uniqueSuffix);
     }
 });
-
-const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
         cb(null, true);
-    } else {
+    }
+    else {
         cb(new Error('Only PDF files are allowed'));
     }
 };
-const upload = multer({ storage, fileFilter });
-
-aiRouter.post('/analyzeDescription', async (req: customRequest, res: Response) => {
+const upload = (0, multer_1.default)({ storage, fileFilter });
+exports.aiRouter.post('/analyzeDescription', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { description } = req.body;
     const prompt = `{
         "input": {
@@ -67,20 +73,18 @@ aiRouter.post('/analyzeDescription', async (req: customRequest, res: Response) =
             "experience_level": "string"
         }
     }`;
-
     try {
-        const result = await model.generateContent(prompt);
-        const responseText = await result.response.text();
+        const result = yield model.generateContent(prompt);
+        const responseText = yield result.response.text();
         const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
         const json = JSON.parse(cleanedResponse);
-
         res.json(json);
-    } catch (error) {
+    }
+    catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error', error });
     }
-});
-
+}));
 // aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customRequest, res: Response) => {
 //     const { jobDescription , resumeText } = req.body || "";
 //     try {
@@ -113,13 +117,11 @@ aiRouter.post('/analyzeDescription', async (req: customRequest, res: Response) =
 //                 }
 //                 }`;
 //             }
-          
 //             try {
 //                 const result = await model.generateContent(prompt);
 //                 const responseText = await result.response.text();
 //                 const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
 //                 const json = JSON.parse(cleanedResponse);
-                
 //                 res.json(json);
 //             } catch (error) {
 //                 console.error(error);
@@ -130,18 +132,18 @@ aiRouter.post('/analyzeDescription', async (req: customRequest, res: Response) =
 //         res.status(500).json({ message: 'Server error', error });
 //     }
 // });
-aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customRequest, res: Response) => {
+exports.aiRouter.post('/analyzeResume', upload.single('resumeFile'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { jobDescription } = req.body || "";
     try {
         if (!req.file) {
             res.status(400).json({ message: 'No file uploaded' });
             return;
         }
-        const resumeText = await extractPdfText(`./dist/routes/uploads/${req.file.filename}`) 
-        console.log(resumeText)
+        const resumeText = yield extractPdfText(`./dist/routes/uploads/${req.file.filename}`);
+        console.log(resumeText);
         let prompt = '';
         if (jobDescription !== "") {
-                prompt = `{
+            prompt = `{
                 "input": {
                     "resume": "${resumeText}",
                     "job_description": "${jobDescription}"
@@ -155,8 +157,9 @@ aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customR
                     "desired_skills": "array<string>"
                 }
                 }`;
-            } else {
-                prompt = `{
+        }
+        else {
+            prompt = `{
                 "input": {
                     "resume": "${resumeText}"
                 },
@@ -167,44 +170,42 @@ aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customR
                     "detailed_analysis": "string"
                 }
                 }`;
-            }
-          
-            try {
-                const result = await model.generateContent(prompt);
-                const responseText = await result.response.text();
-                const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
-                const json = JSON.parse(cleanedResponse);
-                
-                res.json(json);
-            } catch (error) {
-                console.error(error);
-                res.status(500).json({ message: 'Server error', error });
-            }
-    } catch (error) {
+        }
+        try {
+            const result = yield model.generateContent(prompt);
+            const responseText = yield result.response.text();
+            const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
+            const json = JSON.parse(cleanedResponse);
+            res.json(json);
+        }
+        catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Server error', error });
+        }
+    }
+    catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error', error });
     }
-});
-
-aiRouter.post('/interviewPrep', async (req: customRequest, res: Response) => {
-    const { jobTitle , jobDescription } = req.body;
-    console.log(jobTitle,jobDescription);
+}));
+exports.aiRouter.post('/interviewPrep', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { jobTitle, jobDescription } = req.body;
+    console.log(jobTitle, jobDescription);
     const userId = req.userId;
     const prompt = `{
         "job_title": "${jobTitle}",
         "job_description": "${jobDescription}",
         "task": "Generate interview preparation tips based on the job description"
     }`;
-    try{
-        const result = await model.generateContent(prompt);
+    try {
+        const result = yield model.generateContent(prompt);
         res.json({
             result
-        })
-    }catch(e){
+        });
+    }
+    catch (e) {
         res.json({
             e
         });
     }
-
-});
-
+}));

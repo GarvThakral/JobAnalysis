@@ -16,26 +16,29 @@ exports.userRouter = void 0;
 const express_1 = require("express");
 const zod_1 = require("zod");
 const bcrypt_1 = require("bcrypt");
-const db_1 = require("../database/db");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const userMiddleware_1 = require("../middleware/userMiddleware");
-const userSecret = "s3cret";
+const client_1 = require("@prisma/client");
+const userSecret = process.env.JWT_USER || "";
 const userRouter = (0, express_1.Router)();
 exports.userRouter = userRouter;
+const prisma = new client_1.PrismaClient();
 userRouter.post('/signup', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const reqBody = zod_1.z.object({
-        username: zod_1.z.string().min(3).max(8),
+        username: zod_1.z.string().min(3).max(16),
         email: zod_1.z.string().email(),
-        password: zod_1.z.string().min(4).max(10)
+        password: zod_1.z.string().min(4).max(16)
     });
     const parsedBody = reqBody.parse(req.body);
     const { username, email, password } = parsedBody;
     const hashedPassword = yield (0, bcrypt_1.hash)(password, 5);
     try {
-        const user = db_1.userModel.create({
-            username,
-            email,
-            password: hashedPassword
+        const user = yield prisma.user.create({
+            data: {
+                username,
+                email,
+                password: hashedPassword
+            }
         });
         res.json({
             user
@@ -49,14 +52,15 @@ userRouter.post('/signup', (req, res) => __awaiter(void 0, void 0, void 0, funct
 }));
 userRouter.post('/signin', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const requiredBody = zod_1.z.object({
-        username: zod_1.z.string().min(3).max(8),
-        email: zod_1.z.string().email(),
-        password: zod_1.z.string().min(4).max(10)
+        username: zod_1.z.string().min(3).max(16),
+        password: zod_1.z.string().min(4).max(16)
     });
     const parsedBody = requiredBody.parse(req.body);
     const { username, password } = parsedBody;
-    const user = yield db_1.userModel.findOne({
-        username
+    const user = yield prisma.user.findFirst({
+        where: {
+            username
+        }
     });
     console.log(user);
     if (!user || !user.password) {
@@ -69,7 +73,7 @@ userRouter.post('/signin', (req, res) => __awaiter(void 0, void 0, void 0, funct
         const userPassword = user.password;
         const checkedPassword = yield (0, bcrypt_1.compare)(password, userPassword);
         if (checkedPassword) {
-            const userId = user._id;
+            const userId = user.id;
             const token = jsonwebtoken_1.default.sign({ userId }, userSecret);
             res.json({
                 userId,
@@ -84,13 +88,15 @@ userRouter.post('/signin', (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 }));
 userRouter.get('/:id', userMiddleware_1.userMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = req.params.id;
+    const userId = req.params.id;
     try {
-        const userDetails = yield db_1.userModel.findOne({
-            user
+        const userDetails = yield prisma.user.findFirst({
+            where: {
+                id: userId
+            }
         });
         res.json({
-            user
+            userDetails
         });
     }
     catch (e) {

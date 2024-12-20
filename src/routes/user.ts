@@ -1,20 +1,19 @@
 import { Router } from "express";
 import { z } from "zod";
 import { hash , compare } from "bcrypt"
-import { userModel } from "../database/db";
 import Jwt from "jsonwebtoken";
 import { userMiddleware } from "../middleware/userMiddleware";
 import { PrismaClient } from "@prisma/client";
-const userSecret = "s3cret";
+const userSecret = process.env.JWT_USER || "";
 const userRouter = Router();
 const prisma = new PrismaClient();
 
 
 userRouter.post('/signup',async (req,res)=>{
     const reqBody = z.object({
-        username:z.string().min(3).max(8),
-        email:z.string().email(),
-        password:z.string().min(4).max(10)
+        username:z.string().min(3).max(16),
+        email:z.string().email()    ,
+        password:z.string().min(4).max(16)
     })
     const parsedBody = reqBody.parse(req.body);
     const { username , email , password } = parsedBody;
@@ -38,9 +37,8 @@ userRouter.post('/signup',async (req,res)=>{
 })
 userRouter.post('/signin',async(req,res)=>{
     const requiredBody = z.object({
-        username:z.string().min(3).max(8),
-        email:z.string().email(),
-        password:z.string().min(4).max(10)
+        username:z.string().min(3).max(16),
+        password:z.string().min(4).max(16)
     })
     const parsedBody = requiredBody.parse(req.body);
     const {username,password} = parsedBody;
