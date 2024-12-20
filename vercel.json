@@ -11,12 +11,5 @@
         "src": "/(.*)",
         "dest": "/"
       }
-    ],
-    "build": {
-    "commands": [
-      "npm install",
-      "npm run build",
-      "prisma generate"
     ]
-  }
   }
