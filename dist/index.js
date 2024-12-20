@@ -13,9 +13,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const user_1 = require("./routes/user");
-const jobRoute_1 = require("./routes/jobRoute");
-const aiAnalysis_1 = require("./routes/aiAnalysis");
+const user_1 = require("./src/routes/user");
+const jobRoute_1 = require("./src/routes/jobRoute");
+const aiAnalysis_1 = require("./src/routes/aiAnalysis");
 const client_1 = require("@prisma/client");
 const cors_1 = __importDefault(require("cors"));
 const prisma = new client_1.PrismaClient();
