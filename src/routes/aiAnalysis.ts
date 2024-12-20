@@ -58,7 +58,10 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
     }
 };
 
-const upload = multer({ storage, fileFilter });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter,
+});
 
 // Helper function to clear the uploads directory
 const clearUploadsDirectory = () => {
