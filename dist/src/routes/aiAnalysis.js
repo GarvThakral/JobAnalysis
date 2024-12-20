@@ -84,6 +84,7 @@ exports.aiRouter.post('/analyzeDescription', (req, res) => __awaiter(void 0, voi
         res.status(500).json({ message: 'Server error', error });
     }
 }));
+// Route to analyze resume
 const extractPdfTextFromBuffer = (buffer) => {
     return new Promise((resolve, reject) => {
         let text = "";
@@ -115,17 +116,16 @@ const upload = (0, multer_1.default)({
     },
 });
 // Route to analyze resume
-exports.aiRouter.post('/analyzeResume', upload.single('resumeFile'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.aiRouter.post("/analyzeResume", upload.single("resumeFile"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { jobDescription } = req.body || "";
     try {
-        if (!req.file) {
-            res.status(400).json({ message: 'No file uploaded' });
+        if (!req.file || !req.file.buffer) {
+            res.status(400).json({ message: "No file uploaded" });
             return;
         }
-        const resumeText = yield extractPdfText(`./dist/routes/uploads/${req.file.filename}`);
-        console.log(resumeText);
-        let prompt = '';
-        if (jobDescription !== "") {
+        const resumeText = yield extractPdfTextFromBuffer(req.file.buffer);
+        let prompt = "";
+        if (jobDescription) {
             prompt = `{
                 "input": {
                     "resume": "${resumeText}",
@@ -139,7 +139,7 @@ exports.aiRouter.post('/analyzeResume', upload.single('resumeFile'), (req, res) 
                     "required_skills": "array<string>",
                     "desired_skills": "array<string>"
                 }
-                }`;
+            }`;
         }
         else {
             prompt = `{
@@ -152,23 +152,23 @@ exports.aiRouter.post('/analyzeResume', upload.single('resumeFile'), (req, res) 
                     "missing_keywords": "array<string>",
                     "detailed_analysis": "string"
                 }
-                }`;
+            }`;
         }
         try {
             const result = yield model.generateContent(prompt);
             const responseText = yield result.response.text();
-            const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
+            const cleanedResponse = responseText.replace(/```json/g, "").replace(/```/g, "");
             const json = JSON.parse(cleanedResponse);
             res.json(json);
         }
         catch (error) {
             console.error(error);
-            res.status(500).json({ message: 'Server error', error });
+            res.status(500).json({ message: "Server error", error });
         }
     }
     catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+        res.status(500).json({ message: "Server error", error });
     }
 }));
 exports.aiRouter.post('/interviewPrep', (req, res) => __awaiter(void 0, void 0, void 0, function* () {

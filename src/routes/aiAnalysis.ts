@@ -80,6 +80,8 @@ aiRouter.post('/analyzeDescription', async (req: customRequest, res: Response) =
     }
 });
 
+// Route to analyze resume
+
 const extractPdfTextFromBuffer = (buffer: Buffer): Promise<string> => {
     return new Promise((resolve, reject) => {
         let text = "";
@@ -111,19 +113,20 @@ const upload = multer({
 });
 
 // Route to analyze resume
-
-aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customRequest, res: Response) => {
+aiRouter.post("/analyzeResume", upload.single("resumeFile"), async (req: Request, res: Response) => {
     const { jobDescription } = req.body || "";
+
     try {
-        if (!req.file) {
-            res.status(400).json({ message: 'No file uploaded' });
+        if (!req.file || !req.file.buffer) {
+            res.status(400).json({ message: "No file uploaded" });
             return;
         }
-        const resumeText = await extractPdfText(`./dist/routes/uploads/${req.file.filename}`) 
-        console.log(resumeText)
-        let prompt = '';
-        if (jobDescription !== "") {
-                prompt = `{
+
+        const resumeText = await extractPdfTextFromBuffer(req.file.buffer);
+        let prompt = "";
+
+        if (jobDescription) {
+            prompt = `{
                 "input": {
                     "resume": "${resumeText}",
                     "job_description": "${jobDescription}"
@@ -136,9 +139,9 @@ aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customR
                     "required_skills": "array<string>",
                     "desired_skills": "array<string>"
                 }
-                }`;
-            } else {
-                prompt = `{
+            }`;
+        } else {
+            prompt = `{
                 "input": {
                     "resume": "${resumeText}"
                 },
@@ -148,25 +151,26 @@ aiRouter.post('/analyzeResume', upload.single('resumeFile'), async (req: customR
                     "missing_keywords": "array<string>",
                     "detailed_analysis": "string"
                 }
-                }`;
-            }
-          
-            try {
-                const result = await model.generateContent(prompt);
-                const responseText = await result.response.text();
-                const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '');
-                const json = JSON.parse(cleanedResponse);
-                
-                res.json(json);
-            } catch (error) {
-                console.error(error);
-                res.status(500).json({ message: 'Server error', error });
-            }
+            }`;
+        }
+
+        try {
+            const result = await model.generateContent(prompt);
+            const responseText = await result.response.text();
+            const cleanedResponse = responseText.replace(/```json/g, "").replace(/```/g, "");
+            const json = JSON.parse(cleanedResponse);
+
+            res.json(json);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: "Server error", error });
+        }
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+        res.status(500).json({ message: "Server error", error });
     }
 });
+
 
 aiRouter.post('/interviewPrep', async (req: customRequest, res: Response) => {
     const { jobTitle , jobDescription } = req.body;
