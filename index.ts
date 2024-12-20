@@ -1,7 +1,7 @@
 import express from 'express'
-import { userRouter } from './routes/user';
-import { jobRouter } from './routes/jobRoute';
-import { aiRouter } from './routes/aiAnalysis';
+import { userRouter } from './src/routes/user';
+import { jobRouter } from './src/routes/jobRoute';
+import { aiRouter } from './src/routes/aiAnalysis';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors'
 
