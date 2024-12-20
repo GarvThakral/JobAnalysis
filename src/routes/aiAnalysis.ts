@@ -1,21 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Router, Request, Response } from "express";
-import { userMiddleware } from "../middleware/userMiddleware";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { PdfReader } from "pdfreader";
 
 export const aiRouter = Router();
 const genAI = new GoogleGenerativeAI("AIzaSyBrjNAMQdMztUGfXTDTtDEF78nSLkfvE9I");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
 
-// Function to extract text from PDF
-const extractPdfText = (filePath: string): Promise<string> => {
+// Function to extract text from PDF buffer
+const extractPdfTextFromBuffer = (buffer: Buffer): Promise<string> => {
     return new Promise((resolve, reject) => {
         let text = "";
+        const reader = new PdfReader();
 
-        new PdfReader().parseFileItems(filePath, (err, item) => {
+        reader.parseBuffer(buffer, (err, item) => {
             if (err) {
                 console.error("Error reading PDF:", err);
                 reject(err);
@@ -28,67 +26,32 @@ const extractPdfText = (filePath: string): Promise<string> => {
     });
 };
 
-// Interface for custom request
-interface customRequest extends Request {
-    userId?: string;
-    file?: Express.Multer.File;
-}
-
-// Multer storage configuration
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadPath = path.join(__dirname, "uploads");
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}-${file.originalname}`;
-        cb(null, uniqueSuffix);
-    }
-});
-
-// Multer file filter for PDFs
-const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    if (file.mimetype === "application/pdf") {
-        cb(null, true);
-    } else {
-        cb(new Error("Only PDF files are allowed"));
-    }
-};
-
+// Multer configuration for in-memory storage
 const upload = multer({
     storage: multer.memoryStorage(),
-    fileFilter,
+    fileFilter: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+        if (file.mimetype === "application/pdf") {
+            cb(null, true);
+        } else {
+            cb(new Error("Only PDF files are allowed"));
+        }
+    },
 });
 
-// Helper function to clear the uploads directory
-const clearUploadsDirectory = () => {
-    const uploadPath = path.join(__dirname, "uploads");
-    if (fs.existsSync(uploadPath)) {
-        fs.readdirSync(uploadPath).forEach((file) => {
-            const filePath = path.join(uploadPath, file);
-            fs.unlinkSync(filePath);
-        });
-    }
-};
-
 // Route to analyze resume
-aiRouter.post("/analyzeResume", upload.single("resumeFile"), async (req: customRequest, res: Response) => {
+aiRouter.post("/analyzeResume", upload.single("resumeFile"), async (req: Request, res: Response) => {
     const { jobDescription } = req.body || "";
 
     try {
-        if (!req.file) {
+        if (!req.file || !req.file.buffer) {
             res.status(400).json({ message: "No file uploaded" });
             return;
         }
 
-        const filePath = path.join(__dirname, "uploads", req.file.filename);
-        const resumeText = await extractPdfText(filePath);
+        const resumeText = await extractPdfTextFromBuffer(req.file.buffer);
         let prompt = "";
 
-        if (jobDescription !== "") {
+        if (jobDescription) {
             prompt = `{
                 "input": {
                     "resume": "${resumeText}",
@@ -122,9 +85,6 @@ aiRouter.post("/analyzeResume", upload.single("resumeFile"), async (req: customR
             const responseText = await result.response.text();
             const cleanedResponse = responseText.replace(/```json/g, "").replace(/```/g, "");
             const json = JSON.parse(cleanedResponse);
-
-            // Clear uploads directory after successful response
-            clearUploadsDirectory();
 
             res.json(json);
         } catch (error) {

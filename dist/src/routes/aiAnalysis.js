@@ -63,7 +63,10 @@ const fileFilter = (req, file, cb) => {
         cb(new Error("Only PDF files are allowed"));
     }
 };
-const upload = (0, multer_1.default)({ storage, fileFilter });
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    fileFilter,
+});
 // Helper function to clear the uploads directory
 const clearUploadsDirectory = () => {
     const uploadPath = path_1.default.join(__dirname, "uploads");
