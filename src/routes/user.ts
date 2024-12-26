@@ -9,16 +9,36 @@ const userRouter = Router();
 const prisma = new PrismaClient();
 
 
+
 userRouter.post('/signup',async (req,res)=>{
     const reqBody = z.object({
         username:z.string().min(3).max(16),
         email:z.string().email()    ,
-        password:z.string().min(4).max(16)
+        password:z.string().min(3).max(16)
     })
-    const parsedBody = reqBody.parse(req.body);
-    const { username , email , password } = parsedBody;
-    const hashedPassword = await hash(password,5);
     try{
+        const parsedBody = reqBody.parse(req.body);
+        const { username , email , password } = parsedBody;
+        const hashedPassword = await hash(password,5);
+        const existingUser = await prisma.user.findFirst({
+            where: {
+                OR: [{ username }, { email }]
+            }
+        });
+        
+        if (existingUser) {
+            if (existingUser.username === username && existingUser.email === email) {
+                res.status(204).json({ message: 'Both username and email already exist' });
+                return 
+            } else if (existingUser.username === username) {
+                res.status(205).json({ message: 'Username already exists' });
+                return 
+            } else if (existingUser.email === email) {
+                res.status(206).json({ message: 'Email already exists' });
+                return 
+            }
+        }
+        
         const user = await prisma.user.create({
             data:{
                 username,
@@ -30,7 +50,7 @@ userRouter.post('/signup',async (req,res)=>{
             user
         })
     }catch(e){
-        res.json({
+        res.status(203).json({
             error:e
         })
     }
@@ -40,6 +60,7 @@ userRouter.post('/signin',async(req,res)=>{
         username:z.string().min(3).max(16),
         password:z.string().min(4).max(16)
     })
+    try{
     const parsedBody = requiredBody.parse(req.body);
     const {username,password} = parsedBody;
     const user = await prisma.user.findFirst({
@@ -49,7 +70,7 @@ userRouter.post('/signin',async(req,res)=>{
     })
     console.log(user)
     if(!user || !user.password){
-        res.json({
+        res.status(204).json({
             message:"The user does not exist"
         });
         return;
@@ -69,6 +90,9 @@ userRouter.post('/signin',async(req,res)=>{
             })
         }
     }
+    }catch(e){
+        res.status(203).json(e);
+    }   
 })
 userRouter.get('/:id',userMiddleware ,async (req:any,res)=>{
     const userId = req.params.id;
