@@ -175,20 +175,38 @@ exports.aiRouter.post('/interviewPrep', (req, res) => __awaiter(void 0, void 0, 
     const { jobTitle, jobDescription } = req.body;
     console.log(jobTitle, jobDescription);
     const userId = req.userId;
-    const prompt = `{
-        "job_title": "${jobTitle}",
-        "job_description": "${jobDescription}",
-        "task": "Generate interview preparation tips based on the job description"
-    }`;
+    const prompt = `
+        {
+    "job_title": "${jobTitle}",
+    "job_description": "${jobDescription}",
+    "task": "Generate interview preparation tips, QA pairs, and specific common mistakes based on the job description",
+    "response_format": "JSON",
+    "response_schema": {
+        "interview_tips": "array<string>",
+        "qa_pairs": "array<object>",
+        "qa_pairs_structure": {
+            "question": "string",
+            "answer": "string"
+        },
+        "required_documents": "array<string>",
+        "common_mistakes_to_avoid": "array<string>",
+        "job_title": "string"
+    },
+    "instructions": {
+        "common_mistakes": "Ensure the mistakes are specific to the job description and role, avoiding generic suggestions like 'Not researching the company.' Focus on actionable, role-specific feedback."
+    }
+}
+
+        `;
     try {
         const result = yield model.generateContent(prompt);
-        res.json({
-            result
-        });
+        const responseText = yield result.response.text();
+        const cleanedResponse = responseText.replace(/```json/g, "").replace(/```/g, "");
+        const json = JSON.parse(cleanedResponse);
+        res.json(json);
     }
-    catch (e) {
-        res.json({
-            e
-        });
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error", error });
     }
 }));
